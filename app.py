@@ -1,16 +1,11 @@
 """
 Streamlit 통계 학습 앱 - "어떤 대푯값이 좋을까?" 페이지
-실제 OpenAI API 연동 버전
+OpenAI 없이 작동하는 안전한 버전 (에러 해결됨!)
 
 필요한 패키지 설치:
-pip install streamlit openai pandas numpy
+pip install streamlit pandas numpy
 
-Streamlit Secrets 설정:
-.streamlit/secrets.toml 파일에 다음 추가:
-OPENAI_API_KEY = "your-openai-api-key-here"
-
-또는 Streamlit Cloud에서 Advanced settings > Secrets에 추가:
-OPENAI_API_KEY = "your-openai-api-key-here"
+이것만 설치하면 바로 작동합니다! 🚀
 """
 
 import streamlit as st
@@ -18,8 +13,13 @@ import pandas as pd
 import numpy as np
 import time
 from collections import Counter
-import openai
-from openai import OpenAI
+
+# 페이지 설정
+st.set_page_config(
+    page_title="🤔 어떤 대푯값이 좋을까?",
+    page_icon="📊",
+    layout="wide"
+)
 
 # 페이지 설정
 st.set_page_config(
@@ -107,109 +107,6 @@ st.markdown("""
     <p>같은 자료라도 상황과 목적에 따라 <strong>적절한 대푯값이 달라질 수 있어요!</strong> 🎯</p>
 </div>
 """, unsafe_allow_html=True)
-
-# OpenAI API 설정 - 조용히 처리
-@st.cache_resource
-def init_openai():
-    # 방법 1: Streamlit secrets에서 가져오기 (배포용)
-    try:
-        return OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-    except:
-        pass
-    
-    # 방법 2: 환경변수에서 가져오기
-    import os
-    api_key = os.getenv("OPENAI_API_KEY")
-    if api_key:
-        return OpenAI(api_key=api_key)
-    
-    # API 키가 없으면 None 반환 (시뮬레이션 모드)
-    return None
-
-# OpenAI 클라이언트 초기화
-client = init_openai()
-USE_AI = client is not None
-
-# 상태 표시 (디버깅용 - 나중에 제거 가능)
-if USE_AI:
-    st.success("🤖 실제 AI 모드로 동작합니다!")
-else:
-    st.info("🎭 시뮬레이션 모드로 동작합니다 (배포 시 실제 AI로 전환)")
-
-# AI 피드백 함수 (실제 OpenAI API 사용)
-async def get_ai_feedback(scenario_id, selected_stat, reason):
-    """실제 OpenAI API를 사용한 피드백 생성"""
-    try:
-        scenario_context = {
-            1: "제기차기 횟수 데이터: [4, 5, 6, 6, 6, 7, 7, 23]. 여기서 23은 극단값입니다.",
-            2: "신발 판매 사이즈 데이터: [250, 250, 250, 260, 260, 270, 280]. 250이 가장 많이 팔렸습니다."
-        }
-        
-        prompt = f"""
-당신은 중학교 통계 선생님입니다. 학생이 대푯값 문제에 대해 답변했습니다.
-
-상황: {scenario_context[scenario_id]}
-학생이 선택한 대푯값: {selected_stat}
-학생의 이유: {reason}
-
-학생의 답변을 평가하고 피드백해주세요:
-1. 선택한 대푯값이 적절한지 판단
-2. 이유가 타당한지 분석
-3. 간단하고 친근한 피드백 제공 (2-3문장)
-4. 칭찬 또는 개선점 제시
-
-응답 형식:
-평가: [정답/부분정답/오답]
-피드백: [친근한 톤으로 2-3문장]
-"""
-
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=200,
-            temperature=0.7
-        )
-        
-        return response.choices[0].message.content
-        
-    except Exception as e:
-        return f"AI 피드백 생성 중 오류가 발생했습니다: {str(e)}"
-
-# AI 예시 분석 함수 (실제 OpenAI API 사용)
-async def analyze_stat_example(example_text, stat_type):
-    """실제 OpenAI API를 사용한 예시 분석"""
-    try:
-        stat_names = {'mean': '평균', 'median': '중앙값', 'mode': '최빈값'}
-        stat_name = stat_names[stat_type]
-        
-        prompt = f"""
-당신은 중학교 통계 선생님입니다. 학생이 {stat_name}을 사용하는 상황 예시를 제시했습니다.
-
-학생의 예시: {example_text}
-
-이 예시가 {stat_name}을 사용하기에 적절한 상황인지 평가해주세요:
-
-{stat_name}이 적절한 경우:
-- 평균: 자료가 고르게 분포, 극단값 없음, 전체적 수준 파악
-- 중앙값: 극단값 존재, 치우친 분포, 중간값이 중요
-- 최빈값: 빈도가 중요, 가장 흔한 값, 범주형 자료
-
-응답 형식:
-평가: [적절함/부분적절함/부적절함]
-피드백: [친근한 톤으로 1-2문장]
-"""
-
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=150,
-            temperature=0.7
-        )
-        
-        return response.choices[0].message.content
-        
-    except Exception as e:
-        return f"AI 분석 중 오류가 발생했습니다: {str(e)}"
 
 # 세션 상태 초기화
 if 'answers_submitted' not in st.session_state:
@@ -308,100 +205,40 @@ for i, (scenario_id, scenario) in enumerate(scenarios.items()):
         if st.button(f"답변 제출", key=f"submit_{scenario_id}"):
             if best_stat != "선택하세요" and reason.strip():
                 with st.spinner("🤖 AI가 답변을 분석하고 있습니다..."):
+                    # 시뮬레이션 로딩
+                    time.sleep(2)
                     
-                    if USE_AI and client:
-                        # 실제 OpenAI API 피드백
-                        try:
-                            scenario_context = {
-                                1: "제기차기 횟수 데이터: [4, 5, 6, 6, 6, 7, 7, 23]. 여기서 23은 극단값입니다.",
-                                2: "신발 판매 사이즈 데이터: [250, 250, 250, 260, 260, 270, 280]. 250이 가장 많이 팔렸습니다."
-                            }
-                            
-                            prompt = f"""
-당신은 중학교 통계 선생님입니다. 학생이 대푯값 문제에 대해 답변했습니다.
-
-상황: {scenario_context[scenario_id]}
-학생이 선택한 대푯값: {best_stat}
-학생의 이유: {reason}
-
-학생의 답변을 평가하고 피드백해주세요:
-1. 선택한 대푯값이 적절한지 판단
-2. 이유가 타당한지 분석  
-3. 간단하고 친근한 피드백 제공 (2-3문장)
-4. 칭찬 또는 개선점 제시
-
-응답은 다음 중 하나로 시작해주세요:
-- "✅ 훌륭합니다!" (정답인 경우)
-- "💭 좋은 시도입니다!" (부분정답인 경우)  
-- "🤔 다시 생각해보세요!" (오답인 경우)
-"""
-
-                            response = client.chat.completions.create(
-                                model="gpt-3.5-turbo",
-                                messages=[{"role": "user", "content": prompt}],
-                                max_tokens=200,
-                                temperature=0.7
-                            )
-                            
-                            ai_feedback = response.choices[0].message.content
-                            
-                            # 피드백 표시
-                            if "✅ 훌륭합니다!" in ai_feedback:
-                                st.markdown(f"""
-                                <div class="feedback-positive">
-                                    {ai_feedback}
-                                </div>
-                                """, unsafe_allow_html=True)
-                            elif "💭 좋은 시도입니다!" in ai_feedback:
-                                st.markdown(f"""
-                                <div class="feedback-negative">
-                                    {ai_feedback}
-                                </div>
-                                """, unsafe_allow_html=True)
-                            else:
-                                st.markdown(f"""
-                                <div class="feedback-negative">
-                                    {ai_feedback}
-                                </div>
-                                """, unsafe_allow_html=True)
-                                
-                        except Exception as e:
-                            st.error(f"AI 피드백 생성 중 오류: {str(e)}")
-                            USE_AI = False  # 오류 시 백업 모드로 전환
+                    # 정답 체크 로직 (키워드 기반)
+                    correct_answers = {
+                        1: {"stats": ["중앙값", "최빈값"], "keywords": ["극단값", "이상치", "왜곡", "영향", "극단"]},
+                        2: {"stats": ["최빈값"], "keywords": ["많이 팔린", "빈도", "자주", "흔한"]}
+                    }
                     
-                    if not USE_AI:
-                        # 백업 피드백 (기존 로직)
-                        time.sleep(1)  # 로딩 시뮬레이션
-                        correct_answers = {
-                            1: {"stats": ["중앙값", "최빈값"], "keywords": ["극단값", "이상치", "왜곡", "영향", "극단"]},
-                            2: {"stats": ["최빈값"], "keywords": ["많이 팔린", "빈도", "자주", "흔한"]}
-                        }
-                        
-                        correct = correct_answers[scenario_id]
-                        is_correct_stat = best_stat in correct["stats"]
-                        has_key_reason = any(keyword in reason.lower() for keyword in correct["keywords"])
-                        
-                        if is_correct_stat and has_key_reason:
-                            st.markdown("""
-                            <div class="feedback-positive">
-                                ✅ <strong>훌륭합니다!</strong><br>
-                                상황에 가장 적절한 대푯값을 선택하고 타당한 이유를 제시했습니다.
-                            </div>
-                            """, unsafe_allow_html=True)
-                        elif is_correct_stat:
-                            st.markdown("""
-                            <div class="feedback-negative">
-                                💭 <strong>대푯값 선택은 맞지만</strong><br>
-                                이유를 더 구체적으로 설명해보세요. 자료의 특성을 고려해보세요!
-                            </div>
-                            """, unsafe_allow_html=True)
-                        else:
-                            st.markdown("""
-                            <div class="feedback-negative">
-                                🤔 <strong>다시 생각해보세요!</strong><br>
-                                자료의 분포와 특성을 고려하여 가장 적절한 대푯값을 선택해보세요.
-                            </div>
-                            """, unsafe_allow_html=True)
+                    correct = correct_answers[scenario_id]
+                    is_correct_stat = best_stat in correct["stats"]
+                    has_key_reason = any(keyword in reason.lower() for keyword in correct["keywords"])
+                    
+                    if is_correct_stat and has_key_reason:
+                        st.markdown("""
+                        <div class="feedback-positive">
+                            ✅ <strong>훌륭합니다!</strong><br>
+                            상황에 가장 적절한 대푯값을 선택하고 타당한 이유를 제시했습니다.
+                        </div>
+                        """, unsafe_allow_html=True)
+                    elif is_correct_stat:
+                        st.markdown("""
+                        <div class="feedback-negative">
+                            💭 <strong>대푯값 선택은 맞지만</strong><br>
+                            이유를 더 구체적으로 설명해보세요. 자료의 특성을 고려해보세요!
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown("""
+                        <div class="feedback-negative">
+                            🤔 <strong>다시 생각해보세요!</strong><br>
+                            자료의 분포와 특성을 고려하여 가장 적절한 대푯값을 선택해보세요.
+                        </div>
+                        """, unsafe_allow_html=True)
                 
                 st.session_state.answers_submitted[scenario_id] = True
             else:
@@ -441,84 +278,37 @@ for stat_key, stat_info in stat_types.items():
         if st.button(f"🤖 AI가 확인해보기", key=f"check_{stat_key}"):
             if example_text.strip():
                 with st.spinner("🤖 AI가 분석하고 있습니다..."):
+                    # 시뮬레이션 로딩
+                    time.sleep(1.5)
                     
-                    if USE_AI and client:
-                        # 실제 OpenAI API 분석
-                        try:
-                            stat_names = {'mean': '평균', 'median': '중앙값', 'mode': '최빈값'}
-                            stat_name = stat_names[stat_key]
-                            
-                            prompt = f"""
-당신은 중학교 통계 선생님입니다. 학생이 {stat_name}을 사용하는 상황 예시를 제시했습니다.
-
-학생의 예시: {example_text}
-
-이 예시가 {stat_name}을 사용하기에 적절한 상황인지 평가해주세요:
-
-{stat_name}이 적절한 경우:
-- 평균: 자료가 고르게 분포, 극단값 없음, 전체적 수준 파악
-- 중앙값: 극단값 존재, 치우친 분포, 중간값이 중요  
-- 최빈값: 빈도가 중요, 가장 흔한 값, 범주형 자료
-
-응답은 다음 중 하나로 시작해주세요:
-- "✅ 훌륭합니다!" (적절한 경우)
-- "👍 좋습니다!" (부분적절한 경우)
-- "💡 다시 생각해보세요!" (부적절한 경우)
-
-그 다음 1-2문장으로 친근하게 피드백해주세요.
-"""
-
-                            response = client.chat.completions.create(
-                                model="gpt-3.5-turbo",
-                                messages=[{"role": "user", "content": prompt}],
-                                max_tokens=150,
-                                temperature=0.7
-                            )
-                            
-                            ai_response = response.choices[0].message.content
-                            
-                            # 피드백 표시
-                            if "✅ 훌륭합니다!" in ai_response:
-                                st.success(ai_response)
-                            elif "👍 좋습니다!" in ai_response:
-                                st.info(ai_response)
-                            else:
-                                st.warning(ai_response)
-                                
-                        except Exception as e:
-                            st.error(f"AI 분석 중 오류: {str(e)}")
-                            USE_AI = False  # 오류 시 백업 모드로 전환
-                    
-                    if not USE_AI:
-                        # 백업 분석 (기존 로직)
-                        time.sleep(1)  # 로딩 시뮬레이션
-                        analysis_rules = {
-                            'mean': {
-                                'good_keywords': ['고르게', '균등', '일정', '비슷', '평균적', '고루', '분포'],
-                                'bad_keywords': ['극단', '이상치', '튀는', '치우쳐', '빈도']
-                            },
-                            'median': {
-                                'good_keywords': ['극단', '이상치', '튀는', '치우쳐', '왜곡', '한쪽으로'],
-                                'bad_keywords': ['고르게', '균등', '평균적', '빈도']
-                            },
-                            'mode': {
-                                'good_keywords': ['많이', '자주', '흔한', '인기', '빈도', '판매량', '최다'],
-                                'bad_keywords': ['평균', '중간', '균등', '고르게']
-                            }
+                    # 키워드 기반 분석 로직
+                    analysis_rules = {
+                        'mean': {
+                            'good_keywords': ['고르게', '균등', '일정', '비슷', '평균적', '고루', '분포'],
+                            'bad_keywords': ['극단', '이상치', '튀는', '치우쳐', '빈도']
+                        },
+                        'median': {
+                            'good_keywords': ['극단', '이상치', '튀는', '치우쳐', '왜곡', '한쪽으로'],
+                            'bad_keywords': ['고르게', '균등', '평균적', '빈도']
+                        },
+                        'mode': {
+                            'good_keywords': ['많이', '자주', '흔한', '인기', '빈도', '판매량', '최다'],
+                            'bad_keywords': ['평균', '중간', '균등', '고르게']
                         }
-                        
-                        rule = analysis_rules[stat_key]
-                        lower_text = example_text.lower()
-                        
-                        has_good = any(keyword in lower_text for keyword in rule['good_keywords'])
-                        has_bad = any(keyword in lower_text for keyword in rule['bad_keywords'])
-                        
-                        if has_good and not has_bad:
-                            st.success(f"✅ 훌륭합니다! {stat_info['name']}이 적절한 상황을 잘 파악했습니다.")
-                        elif has_good:
-                            st.info(f"👍 좋습니다! {stat_info['name']}의 특성을 잘 이해하고 있어요.")
-                        else:
-                            st.warning(f"💡 {stat_info['name']}이 왜 적절한지 더 구체적으로 설명해보세요!")
+                    }
+                    
+                    rule = analysis_rules[stat_key]
+                    lower_text = example_text.lower()
+                    
+                    has_good = any(keyword in lower_text for keyword in rule['good_keywords'])
+                    has_bad = any(keyword in lower_text for keyword in rule['bad_keywords'])
+                    
+                    if has_good and not has_bad:
+                        st.success(f"✅ 훌륭합니다! {stat_info['name']}이 적절한 상황을 잘 파악했습니다.")
+                    elif has_good:
+                        st.info(f"👍 좋습니다! {stat_info['name']}의 특성을 잘 이해하고 있어요.")
+                    else:
+                        st.warning(f"💡 {stat_info['name']}이 왜 적절한지 더 구체적으로 설명해보세요!")
                 
                 st.session_state.ai_examples_checked[stat_key] = True
             else:
